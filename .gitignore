@@ -1,0 +1,6 @@
+# file extensions
+*.out
+
+# directories
+tmp/
+__pycache__/

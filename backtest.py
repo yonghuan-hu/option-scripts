@@ -66,6 +66,7 @@ class OptionStrategy:
         order = trade.order
         # we must have sold an option
         assert order.is_option
+        assert type(order.instrument) == Option
         assert not order.buy
         self.positions[order.instrument] -= 1
         # add/remove stock and cash
@@ -90,7 +91,7 @@ class OptionStrategy:
         self.tick_logic(time, price)
 
     def tick_logic(self, time: datetime, price: float):
-        raise "Base class tick_logic is virtual!"
+        raise TypeError("Base class tick_logic is virtual!")
 
 
 class WheelStrategy(OptionStrategy):

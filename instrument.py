@@ -50,3 +50,11 @@ class Trade:
     order: Order
     price: float
     qty: int
+
+    @property
+    def premium(self) -> float:
+        """
+        The cash premium to be paid/received for this trade.
+        """
+        contract_size = 100 if self.order.is_option else 1
+        return self.price * self.qty * contract_size

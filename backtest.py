@@ -17,7 +17,30 @@ class OptionStrategy:
         self.positions: Dict[Union[Option, str], int] = {}
         self.pending_orders: List[Order] = []
         self.trades: List[Trade] = []
+        self.trades_expired: List[Trade] = []
+        self.trades_assigned: List[Trade] = []
         self.product = product
+
+    # Helper functions
+
+    def log(self, logstr: str):
+        print(f"[{self.time}] {logstr}")
+
+    def log_stats(self):
+        print(f"[{self.time}] Strategy stats:")
+        print(
+            f"\tTrades: {len(self.trades)} total, {len(self.trades_assigned)} assigned")
+        print(f"\tCash: ${self.cash:.2f}")
+        print(f"\tPosition: ${self.positions}")
+
+    def add_position(self, instrument: Union[Option, str], qty: int):
+        if instrument not in self.positions:
+            self.positions[instrument] = 0
+        self.positions[instrument] += qty
+        if self.positions[instrument] == 0:
+            del self.positions[instrument]
+
+    # Market access
 
     def send_order_option(self, buy: bool, call: bool, dte: int, strike: int, qty: int):
         """
@@ -39,49 +62,54 @@ class OptionStrategy:
         self.next_order_id += 1
         self.pending_orders.append(order)
 
+    # Market events
+
     def fill_event(self, trade: Trade):
         """
         Handler for order execution.
         """
         print(
-            f"[{self.time}] Order id={trade.order.id} filled at ${trade.price} x{trade.qty}")
+            f"[{self.time}] Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
         order = trade.order
-        if order.instrument not in self.positions:
-            self.positions[order.instrument] = 0
-        if order.product not in self.positions:
-            self.positions[order.product] = 0
         if order.buy:
-            self.cash -= trade.price
-            self.positions[order.instrument] += 1
+            self.cash -= trade.premium
+            self.add_position(order.instrument, trade.qty)
         else:
-            self.cash += trade.price
-            self.positions[order.instrument] -= 1
+            self.cash += trade.premium
+            self.add_position(order.instrument, -1 * trade.qty)
 
     def assignment_event(self, trade: Trade, spot_price: float):
         """
         Handler for option assignment.
         """
-        print(
-            f"[{self.time}] Assigned {trade.order.instrument}, spot price = ${spot_price}")
+        self.log(
+            f"Assigned {trade.order.instrument}, spot price = ${spot_price}")
         order = trade.order
         # we must have sold an option
         assert order.is_option
         assert type(order.instrument) == Option
         assert not order.buy
-        self.positions[order.instrument] -= 1
+        self.add_position(order.instrument, trade.qty)
         # add/remove stock and cash
         if order.instrument.call:
-            self.positions[order.product] -= 100
+            self.add_position(order.product, -1 * trade.qty * 100)
             self.cash += order.instrument.strike * 100
         else:
-            self.positions[order.product] += 100
+            self.add_position(order.product, trade.qty * 100)
             self.cash -= order.instrument.strike * 100
+        self.trades_assigned.append(trade)
 
     def close_event(self, expired_trades: List[Trade]):
         """
         Handler for market close.
         """
-        pass
+        for trade in expired_trades:
+            assert trade.order.is_option
+            if trade.order.buy:
+                self.add_position(trade.order.instrument, -1 * trade.qty)
+            else:
+                self.add_position(trade.order.instrument, trade.qty)
+        self.trades_expired.extend(expired_trades)
 
     def tick_event(self, time: datetime, price: float):
         """
@@ -89,6 +117,8 @@ class OptionStrategy:
         """
         self.time = time
         self.tick_logic(time, price)
+
+    # Interfaces to be implemented by subclasses
 
     def tick_logic(self, time: datetime, price: float):
         raise TypeError("Base class tick_logic is virtual!")
@@ -162,3 +192,4 @@ if __name__ == "__main__":
                         expired_trades.append(trade)
             # notify market close
             strategy.close_event(expired_trades)
+            strategy.log_stats()

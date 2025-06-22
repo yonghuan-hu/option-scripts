@@ -1,6 +1,8 @@
 import math
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 from datetime import datetime, timedelta
+
+from matplotlib import pyplot as plt
 from instrument import *
 from tick import load_csv
 
@@ -19,7 +21,12 @@ class OptionStrategy:
         self.trades: List[Trade] = []
         self.trades_expired: List[Trade] = []
         self.trades_assigned: List[Trade] = []
-        self.product = product
+        self.product: str = product
+        self.product_val: float = 0.0
+
+        # Stats over time
+        # Tuple(time, total_nav, stock_value)
+        self.asset_value_history: List[Tuple[datetime, float, float]] = []
 
     # Helper functions
 
@@ -103,6 +110,7 @@ class OptionStrategy:
         """
         Handler for market close.
         """
+        # remove expired options
         for trade in expired_trades:
             assert trade.order.is_option
             if trade.order.buy:
@@ -110,12 +118,17 @@ class OptionStrategy:
             else:
                 self.add_position(trade.order.instrument, trade.qty)
         self.trades_expired.extend(expired_trades)
+        # track daily NAV
+        stock_value = self.positions.get(self.product, 0) * self.product_val
+        nav = self.cash + stock_value
+        self.asset_value_history.append((self.time, nav, stock_value))
 
     def tick_event(self, time: datetime, price: float):
         """
         Handler for tick data update.
         """
         self.time = time
+        self.product_val = price
         self.tick_logic(time, price)
 
     # Interfaces to be implemented by subclasses
@@ -135,12 +148,12 @@ class WheelStrategy(OptionStrategy):
         if time.hour == 10 and time.minute == 0:
             if self.holding_stock:
                 # sell call
-                strike = math.floor(price+otm_price_offset)
+                strike = math.floor(price + otm_price_offset)
                 self.send_order_option(
                     buy=False, call=True, dte=0, strike=strike, qty=1)
             else:
                 # sell put
-                strike = math.ceil(price+otm_price_offset)
+                strike = math.ceil(price - otm_price_offset)
                 self.send_order_option(
                     buy=False, call=False, dte=0, strike=strike, qty=1)
 
@@ -148,6 +161,7 @@ class WheelStrategy(OptionStrategy):
 if __name__ == "__main__":
     data = load_csv("data/SPY-2019-2025-30min.csv")
     strategy = WheelStrategy("SPY")
+    strategy.cash = 50000
     for tick_idx, tick in enumerate(data):
         # feed tick data to strategy
         strategy.tick_event(tick.time, tick.open)
@@ -159,7 +173,7 @@ if __name__ == "__main__":
             if order.is_option:
                 # option orders: always fill at market bbo
                 strike = order.instrument.strike
-                premium = 1.0  # todo: calculate premium using VIX
+                premium = 0.5  # todo: calculate premium using VIX
                 trade = Trade(order, premium, order.qty)
             else:
                 # stock orders: check for price limit
@@ -193,3 +207,17 @@ if __name__ == "__main__":
             # notify market close
             strategy.close_event(expired_trades)
             strategy.log_stats()
+
+    # plot daily P&L
+    times, aums, stock_values = zip(*strategy.asset_value_history)
+    # plot stock value only when it's non-zero
+    filtered_stock = [(t, v) for t, v in zip(times, stock_values) if v != 0.0]
+    plt.figure(figsize=(20, 10))
+    plt.plot(times, aums, label="Total NAV")
+    plt.plot(times, stock_values, label="Stock Value")
+    plt.title("Daily AUM Breakdown")
+    plt.xlabel("Date")
+    plt.ylabel("Value ($)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("tmp/daily_nav.png")

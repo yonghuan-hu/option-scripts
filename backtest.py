@@ -36,9 +36,9 @@ class OptionStrategy:
     def log_stats(self):
         print(f"[{self.time}] Strategy stats:")
         print(
-            f"\tTrades: {len(self.trades)} total, {len(self.trades_assigned)} assigned")
+            f"\tTrades: {len(self.trades)} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired")
         print(f"\tCash: ${self.cash:.2f}")
-        print(f"\tPosition: ${self.positions}")
+        print(f"\tPosition: {self.positions}")
 
     def add_position(self, instrument: Union[Option, str], qty: int):
         if instrument not in self.positions:
@@ -168,7 +168,7 @@ if __name__ == "__main__":
         # check strategy orders
         remaining_orders = []
         for order in strategy.pending_orders:
-            print(f"[{tick.time}] Processing order {order}")
+            strategy.log(f"Order {order}")
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
@@ -210,7 +210,6 @@ if __name__ == "__main__":
 
     # plot daily P&L
     times, aums, stock_values = zip(*strategy.asset_value_history)
-    # plot stock value only when it's non-zero
     filtered_stock = [(t, v) for t, v in zip(times, stock_values) if v != 0.0]
     plt.figure(figsize=(20, 10))
     plt.plot(times, aums, label="Total NAV")

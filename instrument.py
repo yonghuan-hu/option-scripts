@@ -40,6 +40,12 @@ class Order:
     qty: int
     instrument: Union[Option, str]  # stock represented as str
 
+    def __str__(self):
+        return f"id={self.id} {'BUY' if self.buy else 'SELL'} {self.instrument} at ${self.price} x {self.qty}qty"
+
+    def __repr__(self):
+        return str(self)
+
     @property
     def is_option(self) -> bool:
         return self.instrument_type == InstrumentType.OPTION

@@ -22,5 +22,5 @@ conda activate pantheon
 
 Run backtest:
 ```
-python backtest.py > tmp/backtest.out
+python main.py > tmp/backtest.out
 ```

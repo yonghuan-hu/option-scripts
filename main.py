@@ -5,8 +5,8 @@ from tick import load_csv
 if __name__ == "__main__":
     data = load_csv("data/SPY-2019-2025-30min.csv")
     strategies = [
-        WheelStrategy("wheel-1pct-fastexit", "SPY", 50000,
-                      put_otm_pct=0.01, call_otm_pct=0.03),
+        SellCoveredCallStrategy("covered-call", "SPY", 50000,
+                                call_otm_pct=0.03),
         WheelStrategy("wheel-1pct", "SPY", 50000,
                       put_otm_pct=0.01, call_otm_pct=0.01),
         HoldStockStrategy("spot", "SPY", 50000),

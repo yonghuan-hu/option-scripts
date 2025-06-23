@@ -1,6 +1,7 @@
 import math
 from typing import List, Tuple
 from matplotlib import pyplot as plt
+from matplotlib import ticker as ticker
 
 from instrument import *
 from tick import TickData
@@ -17,6 +18,7 @@ def plot(lines: List[Line], plot_path: str):
         plt.plot(times, values, label=name)
     plt.xlabel("Date")
     plt.ylabel("Value ($)")
+    plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(10000))
     plt.legend()
     plt.grid(True)
     plt.savefig(plot_path)

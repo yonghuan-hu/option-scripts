@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Tuple
 from matplotlib import pyplot as plt
 
 from instrument import *
@@ -7,8 +7,22 @@ from tick import TickData
 from price import calculate_option_price
 from strategy import OptionStrategy, Trade
 
+type Line = Tuple[str, List[Tuple[datetime, float]]]
 
-def backtest(strategy: OptionStrategy, data: List[TickData], plot_path: str):
+
+def plot(lines: List[Line], plot_path: str):
+    plt.figure(figsize=(20, 10))
+    for name, line in lines:
+        times, values = zip(*line)
+        plt.plot(times, values, label=name)
+    plt.xlabel("Date")
+    plt.ylabel("Value ($)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(plot_path)
+
+
+def backtest(strategy: OptionStrategy, data: List[TickData]):
     """
     Run the backtest for the given strategy.
     This function is called in the main block.
@@ -62,16 +76,3 @@ def backtest(strategy: OptionStrategy, data: List[TickData], plot_path: str):
             # notify market close
             strategy.close_event(expired_trades)
             strategy.log_stats()
-
-    # plot daily P&L
-    times, aums, stock_values = zip(*strategy.asset_value_history)
-    filtered_stock = [(t, v) for t, v in zip(times, stock_values) if v != 0.0]
-    plt.figure(figsize=(20, 10))
-    plt.plot(times, aums, label="Total NAV")
-    plt.plot(times, stock_values, label="Stock Value")
-    plt.title("Daily AUM Breakdown")
-    plt.xlabel("Date")
-    plt.ylabel("Value ($)")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(plot_path)

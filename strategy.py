@@ -23,9 +23,9 @@ class OptionStrategy:
         self.product_val: float = 0.0
 
         # Stats over time
-        # Tuple(time, total_nav, stock_value)
         self.name: str = name
-        self.asset_value_history: List[Tuple[datetime, float, float]] = []
+        self.asset_value_history: List[Tuple[datetime, float]] = []
+        self.stock_value_history: List[Tuple[datetime, float]] = []
 
     # Helper functions
 
@@ -123,7 +123,8 @@ class OptionStrategy:
         # track daily NAV
         stock_value = self.positions.get(self.product, 0) * self.product_val
         nav = self.cash + stock_value
-        self.asset_value_history.append((self.time, nav, stock_value))
+        self.asset_value_history.append((self.time, nav))
+        self.stock_value_history.append((self.time, stock_value))
 
     def tick_event(self, time: datetime, price: float):
         """
@@ -141,24 +142,32 @@ class OptionStrategy:
 
 class WheelStrategy(OptionStrategy):
 
-    def __init__(self, name: str, product: str, cash: float, otm_pct: float):
-        super().__init__(name, product, cash)
-        self.otm_pct = otm_pct
+    def __init__(self, *args, put_otm_pct: float, call_otm_pct: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.put_otm_pct = put_otm_pct
+        self.call_otm_pct = call_otm_pct
 
     @property
     def holding_stock(self) -> bool:
         return (self.product in self.positions and self.positions[self.product] > 0)
 
     def tick_logic(self, time: datetime, price: float):
-        otm_price_offset = self.otm_pct * price
         if time.hour == 8 and time.minute == 30:
             if self.holding_stock:
                 # sell call
-                strike = math.floor(price + otm_price_offset)
+                strike = math.floor(price * (1.0 + self.call_otm_pct))
                 self.send_order_option(
                     buy=False, call=True, dte=0, strike=strike, qty=1)
             else:
                 # sell put
-                strike = math.ceil(price - otm_price_offset)
+                strike = math.ceil(price * (1.0 - self.call_otm_pct))
                 self.send_order_option(
                     buy=False, call=False, dte=0, strike=strike, qty=1)
+
+
+class HoldStockStrategy(OptionStrategy):
+
+    def tick_logic(self, time: datetime, price: float):
+        if not self.product in self.positions:
+            self.send_order_stock(
+                buy=True, price=price, qty=100)

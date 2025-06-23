@@ -4,18 +4,19 @@ from datetime import datetime, timedelta
 
 from matplotlib import pyplot as plt
 from instrument import *
-from tick import load_csv
+from tick import TickData, load_csv
+from price import calculate_option_price
 
 
 class OptionStrategy:
 
-    def __init__(self, product: str):
+    def __init__(self, name: str, product: str, cash: float):
         # Built-in strategy states
         # User should not modify
         self.next_order_id: int = 0
         self.time: datetime = datetime.strptime(
             "2000-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-        self.cash: float = 0.0
+        self.cash: float = cash
         self.positions: Dict[Union[Option, str], int] = {}
         self.pending_orders: List[Order] = []
         self.trades: List[Trade] = []
@@ -26,6 +27,7 @@ class OptionStrategy:
 
         # Stats over time
         # Tuple(time, total_nav, stock_value)
+        self.name: str = name
         self.asset_value_history: List[Tuple[datetime, float, float]] = []
 
     # Helper functions
@@ -53,7 +55,10 @@ class OptionStrategy:
         """
         Place an option order. The order is queued in pending_orders and will be handled by the backtest framework.
         """
-        expiration = self.time + timedelta(days=dte)
+        # options expire at 4pm ET (3pm CT), but market data shows 6pm ET (5pm CT) is used for pricing
+        expiration_date = (self.time + timedelta(days=dte)).date()
+        expiration = datetime.combine(
+            expiration_date, datetime.strptime("17:00:00", "%H:%M:%S").time())
         option = Option(self.product, call, expiration, strike)
         order = Order(self.next_order_id, buy, self.product,
                       InstrumentType.OPTION, 0, qty, option)
@@ -139,13 +144,17 @@ class OptionStrategy:
 
 class WheelStrategy(OptionStrategy):
 
+    def __init__(self, name: str, product: str, cash: float, otm_pct: float):
+        super().__init__(name, product, cash)
+        self.otm_pct = otm_pct
+
     @property
     def holding_stock(self) -> bool:
         return (self.product in self.positions and self.positions[self.product] > 0)
 
     def tick_logic(self, time: datetime, price: float):
-        otm_price_offset = 0.01 * price
-        if time.hour == 10 and time.minute == 0:
+        otm_price_offset = self.otm_pct * price
+        if time.hour == 9 and time.minute == 0:
             if self.holding_stock:
                 # sell call
                 strike = math.floor(price + otm_price_offset)
@@ -158,12 +167,12 @@ class WheelStrategy(OptionStrategy):
                     buy=False, call=False, dte=0, strike=strike, qty=1)
 
 
-if __name__ == "__main__":
-    data = load_csv("data/SPY-2019-2025-30min.csv")
-    strategy = WheelStrategy("SPY")
-    strategy.cash = 50000
+def backtest(strategy: OptionStrategy, data: List[TickData], plot_path: str):
+    """
+    Run the backtest for the given strategy.
+    This function is called in the main block.
+    """
     for tick_idx, tick in enumerate(data):
-        # feed tick data to strategy
         strategy.tick_event(tick.time, tick.open)
         # check strategy orders
         remaining_orders = []
@@ -172,8 +181,13 @@ if __name__ == "__main__":
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                strike = order.instrument.strike
-                premium = 0.5  # todo: calculate premium using VIX
+                # assume atm at 25% IV, 1% otm at 30% IV, 2% otm at 35% IV
+                # TODO: use actual IV data
+                otm_pct = math.fabs(
+                    order.instrument.strike - tick.open) / tick.open
+                iv = 0.25 + otm_pct * 5
+                premium = calculate_option_price(
+                    order.instrument, tick.time, tick.open, iv)
                 trade = Trade(order, premium, order.qty)
             else:
                 # stock orders: check for price limit
@@ -219,4 +233,16 @@ if __name__ == "__main__":
     plt.ylabel("Value ($)")
     plt.legend()
     plt.grid(True)
-    plt.savefig("tmp/daily_nav.png")
+    plt.savefig(plot_path)
+
+
+if __name__ == "__main__":
+    data = load_csv("data/SPY-2019-2025-30min.csv")
+    strategies = [
+        WheelStrategy("wheel-1pct", "SPY", 50000, 0.01),
+        WheelStrategy("wheel-2pct", "SPY", 50000, 0.02),
+    ]
+    for strategy in strategies:
+        print(f"Running backtest for {strategy.name}...")
+        backtest(strategy, data, f"tmp/{strategy.name}.png")
+        print(f"Backtest completed for {strategy.name}.")

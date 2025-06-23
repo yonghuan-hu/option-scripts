@@ -55,10 +55,10 @@ class OptionStrategy:
         """
         Place an option order. The order is queued in pending_orders and will be handled by the backtest framework.
         """
-        # options expire at 4pm ET (3pm CT), but market data shows 6pm ET (5pm CT) is used for pricing
+        # options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT)
         expiration_date = (self.time + timedelta(days=dte)).date()
         expiration = datetime.combine(
-            expiration_date, datetime.strptime("17:00:00", "%H:%M:%S").time())
+            expiration_date, datetime.strptime("16:30:00", "%H:%M:%S").time())
         option = Option(self.product, call, expiration, strike)
         order = Order(self.next_order_id, buy, self.product,
                       InstrumentType.OPTION, 0, qty, option)
@@ -154,7 +154,7 @@ class WheelStrategy(OptionStrategy):
 
     def tick_logic(self, time: datetime, price: float):
         otm_price_offset = self.otm_pct * price
-        if time.hour == 9 and time.minute == 0:
+        if time.hour == 8 and time.minute == 30:
             if self.holding_stock:
                 # sell call
                 strike = math.floor(price + otm_price_offset)
@@ -181,11 +181,11 @@ def backtest(strategy: OptionStrategy, data: List[TickData], plot_path: str):
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                # assume atm at 25% IV, 1% otm at 30% IV, 2% otm at 35% IV
+                # assume atm at 20% IV, 1% otm at 30% IV, 2% otm at 40% IV
                 # TODO: use actual IV data
                 otm_pct = math.fabs(
                     order.instrument.strike - tick.open) / tick.open
-                iv = 0.25 + otm_pct * 5
+                iv = 0.20 + otm_pct * 10
                 premium = calculate_option_price(
                     order.instrument, tick.time, tick.open, iv)
                 trade = Trade(order, premium, order.qty)

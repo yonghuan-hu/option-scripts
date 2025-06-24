@@ -15,9 +15,10 @@ if __name__ == "__main__":
                       dte=1, put_otm_pct=0.01, call_otm_pct=0.01),
         HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
+    pricer = Pricer(0.20, 0.04)
     for strategy in strategies:
         print(f"Strategy {strategy.name} backtesting ...")
-        backtest(strategy, data)
+        backtest(strategy, pricer, data)
         print(f"Strategy {strategy.name} finished")
         # plot strategy PnL
         plot([

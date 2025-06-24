@@ -24,7 +24,7 @@ def plot(lines: List[Line], plot_path: str):
     plt.savefig(plot_path)
 
 
-def backtest(strategy: OptionStrategy, data: List[TickData]):
+def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
     """
     Run the backtest for the given strategy.
     This function is called in the main block.
@@ -40,9 +40,8 @@ def backtest(strategy: OptionStrategy, data: List[TickData]):
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                iv = estimate_iv(order.instrument, tick.open)
-                premium = calculate_option_price(
-                    order.instrument, tick.time, tick.open, iv)
+                premium = pricer.calculate_theo(
+                    order.instrument, tick.time, tick.open)
                 trade = Trade(order, premium, order.qty)
             else:
                 # stock orders: check for price limit

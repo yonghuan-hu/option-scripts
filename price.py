@@ -27,37 +27,51 @@ def round_to_cent(x: float) -> float:
     return round(x * 100.0) / 100.0
 
 
-def estimate_iv(option: Option, val: float) -> float:
-    """
-    Estimate the implied volatility based on empirical observations.
-    Assume 15% IV
-    TODO: use actual IV data
-    """
-    otm_pct = math.fabs(option.strike - val) / val
-    iv = 0.20
-    return iv
+class Pricer:
 
+    def __init__(self, vol: float, r: float):
+        """
+        Initialize the pricer with a fixed volatility and risk-free rate.
+        """
+        self.vol = vol
+        self.r = r
 
-def calculate_option_price(option: Option, time: datetime, val: float, vol: float, r: float = 0.05) -> float:
-    """
-    Calculate the option price using a simple Black-Scholes model.
-    """
-    logger.info(
-        f"Calculating option price for {option} with val={val}, vol={vol}, r={r}")
-    T = (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
-    if T < 0:
-        return 0.0
+    def estimate_vol_skew(self, option: Option, val: float) -> float:
+        """
+        Estimate the implied volatility skew based on empirical observations.
+        TODO: use actual IV data
+        """
+        # every 1% otm, multiply vol by 1.10
+        otm_pct = math.fabs(option.strike - val) / val
+        return self.vol * (1.0 + 0.1 * otm_pct)
 
-    K = option.strike
-    S = val
-    sigma = vol
+    def calculate_theo(self, option: Option, time: datetime, val: float) -> float:
+        """
+        Calculate the option theo price using a simple Black-Scholes model.
+        """
+        logger.info(
+            f"Calculating option price for {option} with val={val}, vol={self.vol}, r={self.r}")
 
-    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
+        # calculate Yte
+        T = (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
+        if T < 0:
+            return 0.0
 
-    if option.call:
-        price = S * cdf(d1) - K * math.exp(-r * T) * cdf(d2)
-    else:
-        price = K * math.exp(-r * T) * cdf(-d2) - S * cdf(-d1)
+        # estimate vol skew
+        skewed_vol = self.estimate_vol_skew(option, val)
 
-    return round_to_cent(price)
+        # Black-Scholes
+        K = option.strike
+        S = val
+        sigma = skewed_vol
+
+        d1 = (math.log(S / K) + (self.r + 0.5 * sigma**2) * T) / \
+            (sigma * math.sqrt(T))
+        d2 = d1 - sigma * math.sqrt(T)
+
+        if option.call:
+            price = S * cdf(d1) - K * math.exp(-self.r * T) * cdf(d2)
+        else:
+            price = K * math.exp(-self.r * T) * cdf(-d2) - S * cdf(-d1)
+
+        return round_to_cent(price)

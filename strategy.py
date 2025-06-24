@@ -1,150 +1,8 @@
 import math
-from typing import Dict, List, Tuple, Union
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from instrument import *
-from log import logger
-from price import round_to_cent
-
-
-class OptionStrategy:
-
-    def __init__(self, name: str, product: str, cash: float):
-        # Built-in strategy states
-        # User should not modify
-        self.next_order_id: int = 0
-        self.time: datetime = datetime.strptime(
-            "2000-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-        self.cash: float = cash
-        self.positions: Dict[Union[Option, str], int] = {}
-        self.pending_orders: List[Order] = []
-        self.trades: List[Trade] = []
-        self.trades_expired: List[Trade] = []
-        self.trades_assigned: List[Trade] = []
-        self.product: str = product
-        self.product_val: float = 0.0
-
-        # Stats
-        self.name: str = name
-        self.log_file = open(f"tmp/{name}.log", "w")
-        self.asset_value_history: List[Tuple[datetime, float]] = []
-        self.stock_value_history: List[Tuple[datetime, float]] = []
-
-    # Helper functions
-
-    def log_stats(self):
-        logger.info(f"Strategy stats:")
-        num_trades = len(self.trades)
-        avg_premium = round_to_cent(
-            sum(trade.premium for trade in self.trades) / num_trades)
-        logger.info(
-            f"\tTrades: {num_trades} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired, avg premium = {avg_premium}")
-        logger.info(f"\tCash: ${self.cash:.2f}")
-        logger.info(f"\tPosition: {self.positions}")
-
-    def add_position(self, instrument: Union[Option, str], qty: int):
-        if instrument not in self.positions:
-            self.positions[instrument] = 0
-        self.positions[instrument] += qty
-        if self.positions[instrument] == 0:
-            del self.positions[instrument]
-
-    @property
-    def holding_stock(self) -> bool:
-        return (self.product in self.positions and self.positions[self.product] > 0)
-
-    # Market access
-
-    def send_order_option(self, buy: bool, call: bool, dte: int, strike: int, qty: int):
-        """
-        Place an option order. The order is queued in pending_orders and will be handled by the backtest framework.
-        """
-        # options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT)
-        expiration_date = (self.time + timedelta(days=dte)).date()
-        expiration = datetime.combine(
-            expiration_date, datetime.strptime("16:30:00", "%H:%M:%S").time())
-        option = Option(self.product, call, expiration, strike)
-        order = Order(self.next_order_id, buy, self.product,
-                      InstrumentType.OPTION, 0, qty, option)
-        self.next_order_id += 1
-        self.pending_orders.append(order)
-
-    def send_order_stock(self, buy: bool, price: float, qty: int):
-        """
-        Place a stock order. The order is queued in pending_orders and will be handled by the backtest framework.
-        """
-        order = Order(self.next_order_id, buy, self.product,
-                      InstrumentType.STOCK, price, qty, self.product)
-        self.next_order_id += 1
-        self.pending_orders.append(order)
-
-    # Market events
-
-    def fill_event(self, trade: Trade):
-        """
-        Handler for order execution.
-        """
-        logger.info(
-            f"[{self.time}] Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
-        order = trade.order
-        if order.buy:
-            self.cash -= trade.premium
-            self.add_position(order.instrument, trade.qty)
-        else:
-            self.cash += trade.premium
-            self.add_position(order.instrument, -1 * trade.qty)
-
-    def assignment_event(self, trade: Trade, spot_price: float):
-        """
-        Handler for option assignment.
-        """
-        logger.info(
-            f"Assigned {trade.order.instrument}, spot price = ${spot_price}")
-        order = trade.order
-        # we must have sold an option
-        assert order.is_option
-        assert type(order.instrument) == Option
-        assert not order.buy
-        self.add_position(order.instrument, trade.qty)
-        # add/remove stock and cash
-        if order.instrument.call:
-            self.add_position(order.product, -1 * trade.qty * 100)
-            self.cash += order.instrument.strike * 100
-        else:
-            self.add_position(order.product, trade.qty * 100)
-            self.cash -= order.instrument.strike * 100
-        self.trades_assigned.append(trade)
-
-    def close_event(self, expired_trades: List[Trade]):
-        """
-        Handler for market close.
-        """
-        # remove expired options
-        for trade in expired_trades:
-            assert trade.order.is_option
-            if trade.order.buy:
-                self.add_position(trade.order.instrument, -1 * trade.qty)
-            else:
-                self.add_position(trade.order.instrument, trade.qty)
-        self.trades_expired.extend(expired_trades)
-        # track daily NAV
-        stock_value = self.positions.get(self.product, 0) * self.product_val
-        nav = self.cash + stock_value
-        self.asset_value_history.append((self.time, nav))
-        self.stock_value_history.append((self.time, stock_value))
-
-    def tick_event(self, time: datetime, price: float):
-        """
-        Handler for tick data update.
-        """
-        self.time = time
-        self.product_val = price
-        self.tick_logic(time, price)
-
-    # Interfaces to be implemented by subclasses
-
-    def tick_logic(self, time: datetime, price: float):
-        raise TypeError("Base class tick_logic is virtual!")
+from strategy_base import OptionStrategy
 
 
 class WheelStrategy(OptionStrategy):
@@ -164,16 +22,17 @@ class WheelStrategy(OptionStrategy):
                     buy=False, call=True, dte=self.dte, strike=strike, qty=1)
             else:
                 # sell put
-                strike = math.ceil(price * (1.0 - self.call_otm_pct))
+                strike = math.ceil(price * (1.0 - self.put_otm_pct))
                 self.send_order_option(
                     buy=False, call=False, dte=self.dte, strike=strike, qty=1)
 
 
 class SellCoveredCallStrategy(OptionStrategy):
 
-    def __init__(self, *args, call_otm_pct: float, **kwargs):
+    def __init__(self, *args, call_otm_pct: float, dte: int, **kwargs):
         super().__init__(*args, **kwargs)
         self.call_otm_pct = call_otm_pct
+        self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
         if time.hour == 8 and time.minute == 30:
@@ -181,12 +40,34 @@ class SellCoveredCallStrategy(OptionStrategy):
                 # sell call
                 strike = math.floor(price * (1.0 + self.call_otm_pct))
                 self.send_order_option(
-                    buy=False, call=True, dte=0, strike=strike, qty=1)
+                    buy=False, call=True, dte=self.dte, strike=strike, qty=1)
             else:
                 # buy stock
                 max_qty = math.floor(self.cash / price)
                 self.send_order_stock(
                     buy=True, price=price, qty=max_qty)
+
+
+class SellPutStrategy(OptionStrategy):
+
+    def __init__(self, *args, put_otm_pct: float, dte: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.put_otm_pct = put_otm_pct
+        self.dte = dte
+
+    def tick_logic(self, time: datetime, price: float):
+        if self.holding_stock:
+            # exit the stock position asap
+            qty = self.positions[self.product]
+            assert qty > 0
+            self.send_order_stock(
+                buy=False, price=price, qty=qty)
+        else:
+            # sell put daily
+            if time.hour == 8 and time.minute == 30:
+                strike = math.ceil(price * (1.0 - self.put_otm_pct))
+                self.send_order_option(
+                    buy=False, call=False, dte=self.dte, strike=strike, qty=1)
 
 
 class HoldStockStrategy(OptionStrategy):

@@ -6,7 +6,9 @@ if __name__ == "__main__":
     data = load_csv("data/SPY-2019-2025-30min.csv")
     strategies = [
         SellCoveredCallStrategy("covered-call", "SPY", 50000,
-                                call_otm_pct=0.03),
+                                dte=7, call_otm_pct=0.02),
+        SellPutStrategy("sell-put", "SPY", 50000,
+                        dte=0, put_otm_pct=0.01),
         WheelStrategy("wheel-0dte-1pct", "SPY", 50000,
                       dte=0, put_otm_pct=0.01, call_otm_pct=0.01),
         WheelStrategy("wheel-1dte-1pct", "SPY", 50000,

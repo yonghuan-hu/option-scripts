@@ -30,11 +30,11 @@ def round_to_cent(x: float) -> float:
 def estimate_iv(option: Option, val: float) -> float:
     """
     Estimate the implied volatility based on empirical observations.
-    Assume atm at 15% IV, 1% otm at 20% IV, 2% otm at 25% IV
+    Assume 15% IV
     TODO: use actual IV data
     """
     otm_pct = math.fabs(option.strike - val) / val
-    iv = 0.15 + otm_pct * 10
+    iv = 0.20
     return iv
 
 
@@ -42,7 +42,8 @@ def calculate_option_price(option: Option, time: datetime, val: float, vol: floa
     """
     Calculate the option price using a simple Black-Scholes model.
     """
-    logger.info(f"Calculating option price for {option} with val={val}, vol={vol}, r={r}")
+    logger.info(
+        f"Calculating option price for {option} with val={val}, vol={vol}, r={r}")
     T = (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
     if T < 0:
         return 0.0

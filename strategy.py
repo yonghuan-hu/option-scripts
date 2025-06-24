@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 from datetime import datetime, timedelta
 
 from instrument import *
+from log import logger
 from price import round_to_cent
 
 
@@ -23,24 +24,23 @@ class OptionStrategy:
         self.product: str = product
         self.product_val: float = 0.0
 
-        # Stats over time
+        # Stats
         self.name: str = name
+        self.log_file = open(f"tmp/{name}.log", "w")
         self.asset_value_history: List[Tuple[datetime, float]] = []
         self.stock_value_history: List[Tuple[datetime, float]] = []
 
     # Helper functions
 
-    def log(self, logstr: str):
-        print(f"[{self.time}] {logstr}")
-
     def log_stats(self):
-        print(f"[{self.time}] Strategy stats:")
+        logger.info(f"Strategy stats:")
         num_trades = len(self.trades)
-        avg_premium = round_to_cent(sum(trade.premium for trade in self.trades) / num_trades)
-        print(
+        avg_premium = round_to_cent(
+            sum(trade.premium for trade in self.trades) / num_trades)
+        logger.info(
             f"\tTrades: {num_trades} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired, avg premium = {avg_premium}")
-        print(f"\tCash: ${self.cash:.2f}")
-        print(f"\tPosition: {self.positions}")
+        logger.info(f"\tCash: ${self.cash:.2f}")
+        logger.info(f"\tPosition: {self.positions}")
 
     def add_position(self, instrument: Union[Option, str], qty: int):
         if instrument not in self.positions:
@@ -84,7 +84,7 @@ class OptionStrategy:
         """
         Handler for order execution.
         """
-        print(
+        logger.info(
             f"[{self.time}] Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
         order = trade.order
         if order.buy:
@@ -98,7 +98,7 @@ class OptionStrategy:
         """
         Handler for option assignment.
         """
-        self.log(
+        logger.info(
             f"Assigned {trade.order.instrument}, spot price = ${spot_price}")
         order = trade.order
         # we must have sold an option

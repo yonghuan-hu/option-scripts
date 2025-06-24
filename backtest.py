@@ -29,12 +29,14 @@ def backtest(strategy: OptionStrategy, data: List[TickData]):
     Run the backtest for the given strategy.
     This function is called in the main block.
     """
+    logger.open(f"tmp/{strategy.name}.log")
     for tick_idx, tick in enumerate(data):
+        logger.settime(tick.time)
         strategy.tick_event(tick.time, tick.open)
         # check strategy orders
         remaining_orders = []
         for order in strategy.pending_orders:
-            strategy.log(f"Order {order}")
+            logger.info(f"Order {order}")
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
@@ -74,3 +76,4 @@ def backtest(strategy: OptionStrategy, data: List[TickData]):
             # notify market close
             strategy.close_event(expired_trades)
             strategy.log_stats()
+    logger.close()

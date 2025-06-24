@@ -14,9 +14,9 @@ if __name__ == "__main__":
         HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
     for strategy in strategies:
-        print(f"Running backtest for {strategy.name}...")
+        print(f"Strategy {strategy.name} backtesting ...")
         backtest(strategy, data)
-        print(f"Backtest completed for {strategy.name}.")
+        print(f"Strategy {strategy.name} finished")
         # plot strategy PnL
         plot([
             ("Asset Value", strategy.asset_value_history),

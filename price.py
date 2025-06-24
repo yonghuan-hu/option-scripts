@@ -1,6 +1,7 @@
 import math
 from datetime import datetime
 from instrument import *
+from log import logger
 
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
@@ -41,7 +42,7 @@ def calculate_option_price(option: Option, time: datetime, val: float, vol: floa
     """
     Calculate the option price using a simple Black-Scholes model.
     """
-    print(f"[{time}] Calculating option price for {option} with val={val}, vol={vol}, r={r}")
+    logger.info(f"Calculating option price for {option} with val={val}, vol={vol}, r={r}")
     T = (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
     if T < 0:
         return 0.0

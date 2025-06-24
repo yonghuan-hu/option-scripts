@@ -6,7 +6,7 @@ from typing import Optional, TextIO
 class Logger:
 
     file: Optional[TextIO] = None
-    time: datetime
+    time: datetime = datetime.fromtimestamp(0)
 
     def info(self, message: str):
         print(f"[{self.time}] {message}", file=self.file)

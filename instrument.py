@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Union
 
@@ -7,6 +7,14 @@ from typing import Union
 class InstrumentType(Enum):
     OPTION = "OPTION"
     STOCK = "STOCK"
+
+
+def to_expiration(date: date) -> datetime:
+    """
+    Create a datetime object for the given year, month, and day.
+    Options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT)
+    """
+    return datetime(date.year, date.month, date.day, 16, 30)
 
 
 @dataclass

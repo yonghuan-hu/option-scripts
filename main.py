@@ -2,6 +2,8 @@ from backtest import *
 from strategy import *
 from tick import load_csv
 
+INTEREST_RATE = 0.04
+
 if __name__ == "__main__":
     data = load_csv("data/SPY-2019-2025-30min.csv")
     strategies = [
@@ -15,7 +17,8 @@ if __name__ == "__main__":
                       dte=1, put_otm_pct=0.01, call_otm_pct=0.01),
         HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
-    pricer = Pricer(0.20, 0.04)
+    pricer = Pricer(INTEREST_RATE)
+    pricer.log_price_matrix(607.0)
     for strategy in strategies:
         print(f"Strategy {strategy.name} backtesting ...")
         backtest(strategy, pricer, data)

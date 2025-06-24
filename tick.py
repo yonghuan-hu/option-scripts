@@ -21,7 +21,7 @@ def load_csv(filename: str) -> List[TickData]:
         for row in reader:
             time = datetime.fromtimestamp(int(row['time']))
             # progress output
-            if cnt % 1000 == 0:
+            if cnt % 10000 == 0:
                 print(f"Loading {time} tick data, cnt = {cnt}")
             cnt += 1
             # construct tick data and add to collection

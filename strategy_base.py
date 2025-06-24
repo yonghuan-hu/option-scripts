@@ -12,8 +12,7 @@ class OptionStrategy:
         # Built-in strategy states
         # User should not modify
         self.next_order_id: int = 0
-        self.time: datetime = datetime.strptime(
-            "2000-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+        self.time: datetime = datetime.fromtimestamp(0)
         self.cash: float = cash
         self.positions: Dict[Union[Option, str], int] = {}
         self.pending_orders: List[Order] = []
@@ -58,10 +57,7 @@ class OptionStrategy:
         """
         Place an option order. The order is queued in pending_orders and will be handled by the backtest framework.
         """
-        # options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT)
-        expiration_date = (self.time + timedelta(days=dte)).date()
-        expiration = datetime.combine(
-            expiration_date, datetime.strptime("16:30:00", "%H:%M:%S").time())
+        expiration = to_expiration(self.time + timedelta(days=dte))
         option = Option(self.product, call, expiration, strike)
         order = Order(self.next_order_id, buy, self.product,
                       InstrumentType.OPTION, 0, qty, option)
@@ -84,7 +80,7 @@ class OptionStrategy:
         Handler for order execution.
         """
         logger.info(
-            f"[{self.time}] Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
+            f"[Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
         order = trade.order
         if order.buy:
             self.cash -= trade.premium

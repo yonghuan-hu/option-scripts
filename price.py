@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from instrument import *
 from log import logger
 
@@ -24,41 +24,46 @@ def round_to_cent(x: float) -> float:
     """
     Round a float to the nearest cent.
     """
-    return round(x * 100.0) / 100.0
+    cent_price = round(x * 100.0) / 100.0
+    return max(cent_price, 0.01)
 
 
 class Pricer:
 
-    def __init__(self, vol: float, r: float):
+    def __init__(self, r: float):
         """
-        Initialize the pricer with a fixed volatility and risk-free rate.
+        Initialize the pricer with a fixed risk-free rate.
         """
-        self.vol = vol
         self.r = r
 
-    def estimate_vol_skew(self, option: Option, val: float) -> float:
+    def yte(self, option: Option, time: datetime) -> float:
         """
-        Estimate the implied volatility skew based on empirical observations.
+        Calculate the years to expiration (Yte) for the given option.
+        """
+        if option.expiration < time:
+            return 0.0
+        return (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
+
+    def estimate_vol(self, option: Option, yte: float, val: float) -> float:
+        """
+        Estimate the implied volatility based on empirical observations.
         TODO: use actual IV data
         """
-        # every 1% otm, multiply vol by 1.10
-        otm_pct = math.fabs(option.strike - val) / val
-        return self.vol * (1.0 + 0.1 * otm_pct)
+        BASE_VOL = 0.15
+        # TODO: model IV, especially how d(IV)/d(OTM) changes with OTM
+        otm_factor = 1 + 3.0/(yte * 365)  # vol += otm_factor per 1% OTM
+        otm = math.fabs(option.strike - val) / val
+        vol = BASE_VOL + otm * otm_factor
+        return vol
 
     def calculate_theo(self, option: Option, time: datetime, val: float) -> float:
         """
         Calculate the option theo price using a simple Black-Scholes model.
         """
-        logger.info(
-            f"Calculating option price for {option} with val={val}, vol={self.vol}, r={self.r}")
-
-        # calculate Yte
-        T = (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
-        if T < 0:
-            return 0.0
 
         # estimate vol skew
-        skewed_vol = self.estimate_vol_skew(option, val)
+        T = self.yte(option, time)
+        skewed_vol = self.estimate_vol(option, T, val)
 
         # Black-Scholes
         K = option.strike
@@ -74,4 +79,37 @@ class Pricer:
         else:
             price = K * math.exp(-self.r * T) * cdf(-d2) - S * cdf(-d1)
 
-        return round_to_cent(price)
+        theo = round_to_cent(price)
+
+        return theo
+
+    def log_price_matrix(self, val: float):
+        """
+        Log a matrix of option prices for different strikes and expirations.
+        Useful for debugging.
+        """
+        print(f"Pricer sample matrix:")
+        time = datetime.now()
+        # header
+        print("-" * 100)
+        header = f"Call    | " + " | ".join(
+            f"{dte:>14}d" for dte in [0, 1, 7, 30])
+        print(header)
+        # table
+        for otm_pct in [0.0, 0.01, 0.02, 0.03]:
+            price_and_vols = []
+            strike = round(val * (1 + otm_pct))
+            for dte in [0, 1, 7, 30]:
+                expiration = to_expiration(time + timedelta(days=dte))
+                option = Option("SPY", True, expiration, strike)
+                yte = self.yte(option, time)
+                vol = self.estimate_vol(option, yte, val)
+                price = self.calculate_theo(option, datetime.now(), val)
+                price_and_vols.append((price, vol))
+            # print prices in a row with fixed width for each col
+            row = f"${strike:<6} | "
+            row += " | ".join(
+                f"${price:<6.2f} {vol * 100:>6.2f}%" for price, vol in price_and_vols)
+            print(row)
+        # footer
+        print("-" * 100)

@@ -5,7 +5,7 @@ from matplotlib import ticker as ticker
 
 from instrument import *
 from tick import TickData
-from price import calculate_option_price
+from price import *
 from strategy import OptionStrategy, Trade
 
 type Line = Tuple[str, List[Tuple[datetime, float]]]
@@ -38,11 +38,7 @@ def backtest(strategy: OptionStrategy, data: List[TickData]):
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                # assume atm at 20% IV, 1% otm at 30% IV, 2% otm at 40% IV
-                # TODO: use actual IV data
-                otm_pct = math.fabs(
-                    order.instrument.strike - tick.open) / tick.open
-                iv = 0.20 + otm_pct * 10
+                iv = estimate_iv(order.instrument, tick.open)
                 premium = calculate_option_price(
                     order.instrument, tick.time, tick.open, iv)
                 trade = Trade(order, premium, order.qty)

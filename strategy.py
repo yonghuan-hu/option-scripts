@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 from datetime import datetime, timedelta
 
 from instrument import *
+from price import round_to_cent
 
 
 class OptionStrategy:
@@ -34,8 +35,10 @@ class OptionStrategy:
 
     def log_stats(self):
         print(f"[{self.time}] Strategy stats:")
+        num_trades = len(self.trades)
+        avg_premium = round_to_cent(sum(trade.premium for trade in self.trades) / num_trades)
         print(
-            f"\tTrades: {len(self.trades)} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired")
+            f"\tTrades: {num_trades} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired, avg premium = {avg_premium}")
         print(f"\tCash: ${self.cash:.2f}")
         print(f"\tPosition: {self.positions}")
 
@@ -146,10 +149,11 @@ class OptionStrategy:
 
 class WheelStrategy(OptionStrategy):
 
-    def __init__(self, *args, put_otm_pct: float, call_otm_pct: float, **kwargs):
+    def __init__(self, *args, put_otm_pct: float, call_otm_pct: float, dte: int, **kwargs):
         super().__init__(*args, **kwargs)
         self.put_otm_pct = put_otm_pct
         self.call_otm_pct = call_otm_pct
+        self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
         if time.hour == 8 and time.minute == 30:
@@ -157,12 +161,12 @@ class WheelStrategy(OptionStrategy):
                 # sell call
                 strike = math.floor(price * (1.0 + self.call_otm_pct))
                 self.send_order_option(
-                    buy=False, call=True, dte=0, strike=strike, qty=1)
+                    buy=False, call=True, dte=self.dte, strike=strike, qty=1)
             else:
                 # sell put
                 strike = math.ceil(price * (1.0 - self.call_otm_pct))
                 self.send_order_option(
-                    buy=False, call=False, dte=0, strike=strike, qty=1)
+                    buy=False, call=False, dte=self.dte, strike=strike, qty=1)
 
 
 class SellCoveredCallStrategy(OptionStrategy):

@@ -7,9 +7,11 @@ if __name__ == "__main__":
     strategies = [
         SellCoveredCallStrategy("covered-call", "SPY", 50000,
                                 call_otm_pct=0.03),
-        WheelStrategy("wheel-1pct", "SPY", 50000,
-                      put_otm_pct=0.01, call_otm_pct=0.01),
-        HoldStockStrategy("spot", "SPY", 50000),
+        WheelStrategy("wheel-0dte-1pct", "SPY", 50000,
+                      dte=0, put_otm_pct=0.01, call_otm_pct=0.01),
+        WheelStrategy("wheel-1dte-1pct", "SPY", 50000,
+                      dte=1, put_otm_pct=0.01, call_otm_pct=0.01),
+        HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
     for strategy in strategies:
         print(f"Running backtest for {strategy.name}...")

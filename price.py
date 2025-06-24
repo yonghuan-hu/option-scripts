@@ -19,6 +19,24 @@ def cdf(x: float) -> float:
     return 0.5 * (1 + sign * erf_approx)
 
 
+def round_to_cent(x: float) -> float:
+    """
+    Round a float to the nearest cent.
+    """
+    return round(x * 100.0) / 100.0
+
+
+def estimate_iv(option: Option, val: float) -> float:
+    """
+    Estimate the implied volatility based on empirical observations.
+    Assume atm at 15% IV, 1% otm at 20% IV, 2% otm at 25% IV
+    TODO: use actual IV data
+    """
+    otm_pct = math.fabs(option.strike - val) / val
+    iv = 0.15 + otm_pct * 10
+    return iv
+
+
 def calculate_option_price(option: Option, time: datetime, val: float, vol: float, r: float = 0.05) -> float:
     """
     Calculate the option price using a simple Black-Scholes model.
@@ -40,6 +58,4 @@ def calculate_option_price(option: Option, time: datetime, val: float, vol: floa
     else:
         price = K * math.exp(-r * T) * cdf(-d2) - S * cdf(-d1)
 
-    # round up the price to $0.01
-    price = math.ceil(price * 100) / 100
-    return price
+    return round_to_cent(price)

@@ -56,7 +56,10 @@ class Order:
 
     @property
     def is_option(self) -> bool:
-        return self.instrument_type == InstrumentType.OPTION
+        if self.instrument_type == InstrumentType.OPTION:
+            assert type(self.instrument) == Option, "Instrument must be Option"
+            return True
+        return False
 
 
 @dataclass

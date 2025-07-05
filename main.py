@@ -17,12 +17,12 @@ if __name__ == "__main__":
                       dte=1, put_otm_pct=0.01, call_otm_pct=0.01),
         HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
-    pricer = Pricer(INTEREST_RATE)
-    pricer.log_price_matrix(607.0)
     for strategy in strategies:
+        pricer = Pricer(INTEREST_RATE)
         print(f"Strategy {strategy.name} backtesting ...")
         backtest(strategy, pricer, data)
         print(f"Strategy {strategy.name} finished")
+        pricer.log_price_matrix()
         # plot strategy PnL
         plot([
             ("Asset Value", strategy.asset_value_history),

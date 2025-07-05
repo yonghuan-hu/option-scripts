@@ -33,6 +33,8 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
     logger.open(f"tmp/{strategy.name}.log")
     for tick_idx, tick in enumerate(data):
         logger.settime(tick.time)
+        # feed latest val to pricer and strategy
+        pricer.val_event(tick.time, tick.open)
         strategy.tick_event(tick.time, tick.open)
         # check strategy orders
         remaining_orders = []
@@ -41,8 +43,7 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                premium = pricer.calculate_theo(
-                    order.instrument, tick.time, tick.open)
+                premium = pricer.calculate_theo(order.instrument)
                 trade = Trade(order, premium, order.qty)
             else:
                 # stock orders: check for price limit
@@ -57,6 +58,8 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
                 strategy.trades.append(trade)
                 strategy.fill_event(trade)
         strategy.pending_orders = remaining_orders
+        # feed full tick data to pricer
+        pricer.tick_event(tick)
         # EOD events
         is_last_tick_of_day = (
             tick_idx + 1 < len(data) and data[tick_idx + 1].time.date() != tick.time.date())

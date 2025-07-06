@@ -46,13 +46,13 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
         if is_last_tick_of_day:
             # check assigned / expired options
             expired_trades = []
-            for trade in strategy.trades:
-                # todo: don't traverse all trades
-                if trade.order.is_option and trade.order.instrument.expiration.date() == tick.time.date():
+            for trade in strategy.trades_option_open:
+                assert trade.order.is_option
+                if trade.order.instrument.expiration.date() <= tick.time.date():
                     option = trade.order.instrument
-                    spot_exceeds_strike = (option.call and tick.close >= option.strike) or (
+                    itm = (option.call and tick.close >= option.strike) or (
                         not option.call and tick.close <= option.strike)
-                    if spot_exceeds_strike:
+                    if itm:
                         strategy.assignment_event(trade, tick.close)
                     else:
                         expired_trades.append(trade)

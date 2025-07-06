@@ -28,7 +28,10 @@ class Option:
         return hash((self.call, self.expiration, self.strike))
 
     def __str__(self):
-        return f"{self.product}{self.expiration.strftime('%Y%m%d')}-{'C' if self.call else 'P'}{self.strike}"
+        """
+        OCC Option Symbology
+        """
+        return f"{self.product}{self.expiration.strftime('%y%m%d')}{'C' if self.call else 'P'}{int(self.strike * 1000):08d}"
 
     def __repr__(self):
         return str(self)
@@ -58,7 +61,7 @@ class Order:
     def is_option(self) -> bool:
         if self.instrument_type == InstrumentType.OPTION:
             assert type(self.instrument) == Option, "Instrument must be Option"
-            return True
+            return type(self.instrument) == Option
         return False
 
 

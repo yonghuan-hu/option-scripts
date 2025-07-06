@@ -26,6 +26,7 @@ if __name__ == "__main__":
         plot([
             ("Asset Value", strategy.asset_value_history),
             ("Stock Value", strategy.stock_value_history),
+            ("Earned Premium", strategy.option_premium_history),
         ], f"tmp/{strategy.name}.png", tick=10000, unit='$')
     # plot pricer history
     pricer.plot_vols("tmp/vols.png")

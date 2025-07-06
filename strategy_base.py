@@ -14,11 +14,13 @@ class OptionStrategy:
         self.next_order_id: int = 0
         self.time: datetime = datetime.fromtimestamp(0)
         self.cash: float = cash
+        self.option_premium_sum: float = 0
         self.positions: Dict[Union[Option, str], int] = {}
         self.pending_orders: List[Order] = []
         self.trades: List[Trade] = []
-        self.trades_expired: List[Trade] = []
-        self.trades_assigned: List[Trade] = []
+        self.trades_option_open: List[Trade] = []
+        self.trades_option_expired: List[Trade] = []
+        self.trades_option_assigned: List[Trade] = []
         self.product: str = product
         self.product_val: float = 0.0
 
@@ -27,16 +29,20 @@ class OptionStrategy:
         self.log_file = open(f"tmp/{name}.log", "w")
         self.asset_value_history: List[Tuple[datetime, float]] = []
         self.stock_value_history: List[Tuple[datetime, float]] = []
+        self.option_premium_history: List[Tuple[datetime, float]] = []
 
     # Helper functions
 
+    @property
+    def num_option_trades(self) -> int:
+        return len(self.trades_option_open) + len(self.trades_option_assigned) + len(self.trades_option_expired)
+
     def log_stats(self):
         logger.info(f"Strategy stats:")
-        num_trades = len(self.trades)
-        avg_premium = round_to_cent(
-            sum(trade.premium for trade in self.trades) / num_trades)
+        avg_premium = 0.0 if self.num_option_trades == 0 else round_to_cent(
+            self.option_premium_sum / self.num_option_trades)
         logger.info(
-            f"\tTrades: {num_trades} total, {len(self.trades_assigned)} assigned, {len(self.trades_expired)} expired, avg premium = {avg_premium}")
+            f"\tTrades: {len(self.trades_option_open)} open, {len(self.trades_option_assigned)} assigned, {len(self.trades_option_expired)} expired, avg premium = ${avg_premium}")
         logger.info(f"\tCash: ${self.cash:.2f}")
         logger.info(f"\tPosition: {self.positions}")
 
@@ -80,14 +86,20 @@ class OptionStrategy:
         Handler for order execution.
         """
         logger.info(
-            f"[Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
+            f"Order id={trade.order.id} filled at ${trade.price} x {trade.qty}qty")
         order = trade.order
         if order.buy:
             self.cash -= trade.premium
+            if order.is_option:
+                self.option_premium_sum -= trade.premium
             self.add_position(order.instrument, trade.qty)
         else:
             self.cash += trade.premium
+            if order.is_option:
+                self.option_premium_sum += trade.premium
             self.add_position(order.instrument, -1 * trade.qty)
+        if order.is_option:
+            self.trades_option_open.append(trade)
 
     def assignment_event(self, trade: Trade, spot_price: float):
         """
@@ -108,25 +120,31 @@ class OptionStrategy:
         else:
             self.add_position(order.product, trade.qty * 100)
             self.cash -= order.instrument.strike * 100
-        self.trades_assigned.append(trade)
+        # update trade records
+        self.trades_option_open.remove(trade)
+        self.trades_option_assigned.append(trade)
 
     def close_event(self, expired_trades: List[Trade]):
         """
         Handler for market close.
         """
-        # remove expired options
         for trade in expired_trades:
             assert trade.order.is_option
+            # remove expired options from positions
             if trade.order.buy:
                 self.add_position(trade.order.instrument, -1 * trade.qty)
             else:
                 self.add_position(trade.order.instrument, trade.qty)
-        self.trades_expired.extend(expired_trades)
+            # update trade records
+            self.trades_option_open.remove(trade)
+            self.trades_option_expired.append(trade)
         # track daily NAV
         stock_value = self.positions.get(self.product, 0) * self.product_val
         nav = self.cash + stock_value
         self.asset_value_history.append((self.time, nav))
         self.stock_value_history.append((self.time, stock_value))
+        self.option_premium_history.append(
+            (self.time, self.option_premium_sum))
 
     def tick_event(self, time: datetime, price: float):
         """

@@ -1,28 +1,8 @@
-import math
-from typing import List, Tuple
-from matplotlib import pyplot as plt
-from matplotlib import ticker as ticker
-
 from instrument import *
-from tick import TickData
+from log import logger
 from price import *
 from strategy import OptionStrategy, Trade
-
-type Line = Tuple[str, List[Tuple[datetime, float]]]
-
-
-def plot(lines: List[Line], plot_path: str):
-    plt.figure(figsize=(20, 10))
-    for name, line in lines:
-        times, values = zip(*line)
-        plt.plot(times, values, label=name)
-    plt.xlabel("Date")
-    plt.ylabel("Value ($)")
-    plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(50000))
-    plt.gca().yaxis.set_minor_locator(ticker.MultipleLocator(10000))
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(plot_path)
+from tick import TickData
 
 
 def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):

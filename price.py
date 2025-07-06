@@ -1,14 +1,35 @@
 import math
+from typing import List, Tuple
+from matplotlib import pyplot as plt
+from matplotlib import ticker as ticker
+
 from datetime import datetime, timedelta
 from typing import List
+
 from instrument import *
-from log import logger
 from tick import TickData
 
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
 TRADING_DAYS_IN_YEAR = 252
+MIN_TICKS_REQUIRED = 10
 DEFAULT_VOL = 0.10
+
+type Line = Tuple[str, List[Tuple[datetime, float]]]
+
+
+def plot(lines: List[Line], plot_path: str, tick: int, unit: str):
+    plt.figure(figsize=(20, 10))
+    for name, line in lines:
+        times, values = zip(*line)
+        plt.plot(times, values, label=name)
+    plt.xlabel("Date")
+    plt.ylabel(f"Value ({unit})")
+    plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(tick * 5))
+    plt.gca().yaxis.set_minor_locator(ticker.MultipleLocator(tick))
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(plot_path)
 
 
 def cdf(x: float) -> float:
@@ -39,6 +60,37 @@ def yte(option: Option, time: datetime) -> float:
     if option.expiration < time:
         return 0.0
     return (option.expiration - time).total_seconds() / SECONDS_IN_YEAR
+
+
+def compute_realized_vol(ticks: List[TickData]) -> float:
+    """
+    Given a list of TickData, compute the realized volatility.
+    Returns DEFAULT_VOL if not enough data.
+    """
+    if len(ticks) < MIN_TICKS_REQUIRED:
+        return DEFAULT_VOL
+
+    log_returns = []
+    for i in range(1, len(ticks)):
+        p0 = ticks[i - 1].close
+        p1 = ticks[i].close
+        if p0 > 0 and p1 > 0:
+            log_returns.append(math.log(p1 / p0))
+
+    # Calculate standard deviation
+    mean = sum(log_returns) / len(log_returns)
+    variance = sum((r - mean) ** 2 for r in log_returns) / \
+        (len(log_returns) - 1)
+    std = math.sqrt(variance)
+
+    # Estimate average time delta between ticks
+    time_deltas = [
+        (ticks[i].time - ticks[i - 1].time).total_seconds()
+        for i in range(1, len(ticks))
+    ]
+    avg_seconds = sum(time_deltas) / len(time_deltas)
+
+    return std * math.sqrt(SECONDS_IN_YEAR / avg_seconds)
 
 
 class Pricer:
@@ -73,38 +125,15 @@ class Pricer:
         """
         Determine the vol for pricing.
         """
-        MIN_TICKS_REQUIRED = 10
-        if len(self.tick_history) < MIN_TICKS_REQUIRED:
-            return DEFAULT_VOL
 
         lookback_period_days = max(7, int(yte * 365))
         # find ticks that are within the lookback period
         ticks = [
             t for t in self.tick_history if t.time >= self.time - timedelta(days=lookback_period_days)]
-        assert len(ticks) >= MIN_TICKS_REQUIRED
 
-        # calculate log returns
-        log_returns = []
-        for i in range(1, len(ticks)):
-            p0 = ticks[i-1].close
-            p1 = ticks[i].close
-            assert p0 > 0 and p1 > 0
-            log_returns.append(math.log(p1 / p0))
+        vol = compute_realized_vol(ticks)
 
-        # compute standard deviation of log returns
-        mean = sum(log_returns) / len(log_returns)
-        variance = sum((r - mean) ** 2 for r in log_returns) / \
-            (len(log_returns) - 1)
-        std = math.sqrt(variance)
-
-        # estimate average time delta
-        time_deltas = [
-            (ticks[i].time - ticks[i-1].time).total_seconds() for i in range(1, len(ticks))
-        ]
-        avg_seconds = sum(time_deltas) / len(time_deltas)
-
-        vol = std * math.sqrt(SECONDS_IN_YEAR / avg_seconds)
-
+        # Vol skew adjustment
         # TODO: improve IV model, especially how d(IV)/d(OTM) changes with OTM
         otm_factor = 1 + 3.0/(yte * 365)  # vol += otm_factor per 1% OTM
         otm_pct = math.fabs(option.strike - self.val) / self.val
@@ -137,6 +166,31 @@ class Pricer:
         theo = round_to_cent(price)
 
         return theo
+
+    def plot_vols(self, plot_path: str):
+        """
+        Plot 7d, 14d, and 30d historical volatility.
+        """
+        assert len(
+            self.tick_history) >= MIN_TICKS_REQUIRED, "Not enough tick data to calculate volatilities."
+
+        windows = [7, 14, 30]
+        lines = []
+
+        for window in windows:
+            vol_percents = []
+            for i in range(len(self.tick_history)):
+                window_start = self.tick_history[i].time - \
+                    timedelta(days=window)
+                window_ticks = [
+                    t for t in self.tick_history if window_start <= t.time <= self.tick_history[i].time
+                ]
+                vol = compute_realized_vol(window_ticks)
+                vol_percents.append((self.tick_history[i].time, vol * 100))
+
+            lines.append((f"{window}d Vol", vol_percents))
+
+        plot(lines, plot_path, tick=1, unit='%')
 
     def log_price_matrix(self):
         """

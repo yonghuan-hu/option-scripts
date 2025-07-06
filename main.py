@@ -22,13 +22,15 @@ if __name__ == "__main__":
         print(f"Strategy {strategy.name} backtesting ...")
         backtest(strategy, pricer, data)
         print(f"Strategy {strategy.name} finished")
-        pricer.log_price_matrix()
         # plot strategy PnL
         plot([
             ("Asset Value", strategy.asset_value_history),
             ("Stock Value", strategy.stock_value_history),
-        ], f"tmp/{strategy.name}.png")
+        ], f"tmp/{strategy.name}.png", tick=10000, unit='$')
+    # plot pricer history
+    pricer.plot_vols("tmp/vols.png")
+    pricer.log_price_matrix()
     # plot all strategies PnL together
     all_strategies_value_history = [
         (strategy.name, strategy.asset_value_history) for strategy in strategies]
-    plot(all_strategies_value_history, f"tmp/combined.png")
+    plot(all_strategies_value_history, f"tmp/combined.png", tick=10000, unit='$')

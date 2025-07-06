@@ -14,7 +14,7 @@ source ~/.bashrc
 
 Set up conda env:
 ```
-conda create -n pantheon python=3.12 numpy matplotlib
+conda create -n pantheon python=3.12 numpy matplotlib yfinance
 conda activate pantheon
 ```
 
@@ -24,3 +24,16 @@ Run backtest:
 ```
 ./run.sh
 ```
+
+Scrape realtime option MD from Yahoo Finance:
+```
+python yfinance_md_monitor.py
+```
+
+Simulate 3x leveraged ETF:
+```
+python simulate_daily_move.py
+```
+
+Script output will be stored in `./tmp/`.
+Fetched data will be stored in `./data/`.

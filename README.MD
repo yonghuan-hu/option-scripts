@@ -27,7 +27,7 @@ Run backtest:
 
 Scrape realtime option MD from Yahoo Finance:
 ```
-python yfinance_md_monitor.py
+python yfinance_scraper.py
 ```
 
 Simulate 3x leveraged ETF:

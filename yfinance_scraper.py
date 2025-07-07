@@ -4,24 +4,26 @@ import pandas as pd
 from time import sleep
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
+from log import logger
 
-
+LOG_PATH = "tmp/yfinance_scraper.log"
 SYMBOLS = ["SPY", "QQQ"]
 DTE_RANGE = 7
+TIME_OPEN = time(8, 30)
+TIME_CLOSE = time(15, 15)
 
 
 def save_realtime_data_1symbol(symbol: str):
     spy = yf.Ticker(symbol)
     now = datetime.now(ZoneInfo("America/Chicago"))
-    print(f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S')} CT")
 
     # determine expirations within the DTE range
     expirations = [
         date for date in spy.options
         if 0 <= (datetime.strptime(date, "%Y-%m-%d").date() - now.date()).days <= DTE_RANGE
     ]
-    print(
-        f"Fetching data for {len(expirations)} expirations (0-7 DTE): {expirations}")
+    logger.info(
+        f"Fetching data for {len(expirations)} {symbol} expirations: {expirations}")
 
     # fetch option chains for each expiration
     data = []
@@ -44,7 +46,7 @@ def save_realtime_data_1symbol(symbol: str):
     path = f"data/{symbol}-options.csv"
     file_exists = os.path.exists(path)
     df.to_csv(path, mode='a', header=not file_exists, index=False)
-    print(f"Appended {len(df)} rows to {path}")
+    logger.info(f"Appended {len(df)} rows to {path}")
 
 
 def save_realtime_data():
@@ -52,19 +54,30 @@ def save_realtime_data():
         save_realtime_data_1symbol(symbol)
 
 
-print("Starting 15-minute polling between 08:30 and 15:15 CT...")
-save_realtime_data()
-while True:
-    now = datetime.now(ZoneInfo("America/Chicago"))
-    if now.weekday() < 5:
-        if time(8, 30) <= now.time() <= time(15, 15):
-            save_realtime_data()
-        else:
-            print(f"Outside active hours: {now.time()}")
-    else:
-        print(f"Weekend: {now.strftime('%A')}, sleeping...")
+if __name__ == "__main__":
+    logger.open(LOG_PATH)
+    print("Starting 15-minute polling between 08:30 and 15:15 CT...")
+    while True:
+        now = datetime.now(ZoneInfo("America/Chicago"))
+        logger.settime(now)
+        assert logger.file
 
-    next_run = (now + timedelta(minutes=15)).replace(second=0, microsecond=0)
-    sleep_time = (
-        next_run - datetime.now(ZoneInfo("America/Chicago"))).total_seconds()
-    sleep(max(sleep_time, 0))
+        # check market hours
+        if now.weekday() < 5 and TIME_OPEN <= now.time() <= TIME_CLOSE:
+            save_realtime_data()
+
+        # sleep until the next 15-minute moment (.00, .15, .30, .45)
+        now = datetime.now(ZoneInfo("America/Chicago"))
+        minute = (now.minute // 15 + 1) * 15
+        if minute == 60:
+            # next hour
+            next_run = now.replace(
+                minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        else:
+            next_run = now.replace(minute=minute, second=0, microsecond=0)
+        logger.info(
+            f"Sleeping till next invocation at {next_run.astimezone(ZoneInfo('America/Chicago'))}")
+        sleep_time = (
+            next_run - datetime.now(ZoneInfo("America/Chicago"))).total_seconds()
+        logger.file.flush()  # flush log before sleeping
+        sleep(max(sleep_time, 0))

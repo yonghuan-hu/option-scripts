@@ -4,3 +4,6 @@
 # directories
 tmp/
 __pycache__/
+
+# option md
+data/*-options.csv

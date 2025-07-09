@@ -1,6 +1,6 @@
 from backtest import *
 from strategy import *
-from tick import load_csv
+from tick_legacy import load_csv
 
 INTEREST_RATE = 0.04
 

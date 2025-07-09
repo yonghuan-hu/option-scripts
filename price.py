@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from instrument import *
-from tick import TickData
+from tick_legacy import TickData
 
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY

@@ -2,7 +2,7 @@ from instrument import *
 from log import logger
 from price import *
 from strategy import OptionStrategy, Trade
-from tick import TickData
+from tick_legacy import TickData
 
 
 def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):

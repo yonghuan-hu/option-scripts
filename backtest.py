@@ -2,20 +2,21 @@ from instrument import *
 from log import logger
 from price import *
 from strategy import OptionStrategy, Trade
-from tick_legacy import TickData
+from tick import MarketDataLoader
 
 
-def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
+def backtest(strategy: OptionStrategy, pricer: Pricer, md: MarketDataLoader):
     """
     Run the backtest for the given strategy.
     This function is called in the main block.
     """
     logger.open(f"tmp/{strategy.name}.log")
-    for tick_idx, tick in enumerate(data):
+    while md.has_next_tick:
+        tick = md.next_tick()
         logger.settime(tick.time)
         # feed latest val to pricer and strategy
-        pricer.val_event(tick.time, tick.open)
-        strategy.tick_event(tick.time, tick.open)
+        pricer.val_event(tick.time, tick.stock_price.open)
+        strategy.tick_event(tick.time, tick.stock_price.open)
         # check strategy orders
         remaining_orders = []
         for order in strategy.pending_orders:
@@ -28,7 +29,7 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
             else:
                 # stock orders: check for price limit
                 can_be_filled = (
-                    order.price >= tick.low and order.price <= tick.high)
+                    order.price >= tick.stock_price.low and order.price <= tick.stock_price.high)
                 if can_be_filled:
                     trade = Trade(order, order.price, order.qty)
                 else:
@@ -41,19 +42,18 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, data: List[TickData]):
         # feed full tick data to pricer
         pricer.tick_event(tick)
         # EOD events
-        is_last_tick_of_day = (
-            tick_idx + 1 < len(data) and data[tick_idx + 1].time.date() != tick.time.date())
-        if is_last_tick_of_day:
+        if md.end_of_day:
             # check assigned / expired options
             expired_trades = []
             for trade in strategy.trades_option_open:
                 assert trade.order.is_option
                 if trade.order.instrument.expiration.date() <= tick.time.date():
                     option = trade.order.instrument
-                    itm = (option.call and tick.close >= option.strike) or (
-                        not option.call and tick.close <= option.strike)
+                    itm = (option.call and tick.stock_price.close >= option.strike) or (
+                        not option.call and tick.stock_price.close <= option.strike)
                     if itm:
-                        strategy.assignment_event(trade, tick.close)
+                        strategy.assignment_event(
+                            trade, tick.stock_price.close)
                     else:
                         expired_trades.append(trade)
             # notify market close

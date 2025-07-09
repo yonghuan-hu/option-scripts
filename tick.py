@@ -49,6 +49,7 @@ class MarketDataLoader:
                                          Dict[str, OptionData]]] = self._option_generator()
 
         # latest and next stock/options
+        self.tick_count = 0
         self.latest_stock: StockData = StockData(
             time=datetime.min,
             open=0.0,
@@ -99,9 +100,18 @@ class MarketDataLoader:
         assert current_time
         yield current_time, chain
 
-    def next_tick(self) -> Optional[TickData]:
-        if self.next_stock is None and self.next_option_time is None:
-            return None
+    @property
+    def has_next_tick(self) -> bool:
+        # TODO: also check options
+        return self.next_stock is not None
+
+    @property
+    def next_tick_time(self) -> datetime:
+        """
+        Find the next tick time based on the next stock and option times, whichever earlier.
+        Caller must check has_next_tick before calling.
+        """
+        assert self.has_next_tick, "No more ticks available"
 
         next_times = []
         if self.next_stock:
@@ -109,23 +119,40 @@ class MarketDataLoader:
         if self.next_option_time:
             next_times.append(self.next_option_time)
 
-        if not next_times:
-            return None
+        return min(next_times)
 
-        # advance to the whichever earlier ts in stock/options
-        current_time = min(next_times)
+    @property
+    def end_of_day(self) -> bool:
+        """
+        Check if the next tick is on a different day.
+        If there is no next tick, return True.
+        """
+        if not self.has_next_tick:
+            return True
 
-        if self.next_stock and self.next_stock.time == current_time:
+        return self.next_tick_time.date() != self.latest_stock.time.date()
+
+    def next_tick(self) -> TickData:
+        """
+        Fetch the next tick and advance iters.
+        Caller must check has_next_tick before calling.
+        """
+        assert self.has_next_tick, "No more ticks available"
+
+        time = self.next_tick_time
+        self.tick_count += 1
+
+        # advance stock and/or option iterators
+        if self.next_stock and self.next_stock.time == time:
             self.latest_stock = self.next_stock
             self.next_stock = next(self.stock_iter, None)
-
-        if self.next_option_time and self.next_option_time == current_time:
+        if self.next_option_time and self.next_option_time == time:
             self.latest_options = self.next_option_chain
             self.next_option_time, self.next_option_chain = next(
                 self.option_iter, (None, {}))
 
         return TickData(
-            time=current_time,
+            time=time,
             stock_price=self.latest_stock,
             option_prices=self.latest_options
         )

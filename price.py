@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from instrument import *
-from tick_legacy import TickData
+from tick import TickData
 
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
@@ -72,8 +72,8 @@ def compute_realized_vol(ticks: List[TickData]) -> float:
 
     log_returns = []
     for i in range(1, len(ticks)):
-        p0 = ticks[i - 1].close
-        p1 = ticks[i].close
+        p0 = ticks[i - 1].stock_price.close
+        p1 = ticks[i].stock_price.close
         if p0 > 0 and p1 > 0:
             log_returns.append(math.log(p1 / p0))
 

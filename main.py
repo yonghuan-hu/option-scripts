@@ -1,11 +1,10 @@
 from backtest import *
 from strategy import *
-from tick_legacy import load_csv
+from tick import MarketDataLoader
 
 INTEREST_RATE = 0.04
 
 if __name__ == "__main__":
-    data = load_csv("data/SPY-2019-2025-30min.csv")
     strategies = [
         SellCoveredCallStrategy("covered-call", "SPY", 50000,
                                 dte=7, call_otm_pct=0.02),
@@ -18,10 +17,14 @@ if __name__ == "__main__":
         HoldStockStrategy("SPY spot", "SPY", 50000),
     ]
     for strategy in strategies:
+        md = MarketDataLoader(
+            stock_filename='data/SPY-2019-2025-30min.csv',
+            option_filename='data/SPY-options.csv'
+        )
         pricer = Pricer(INTEREST_RATE)
-        print(f"Strategy {strategy.name} backtesting ...")
-        backtest(strategy, pricer, data)
-        print(f"Strategy {strategy.name} finished")
+        print(f"Strategy ({strategy.name}) backtesting ...")
+        backtest(strategy, pricer, md)
+        print(f"Strategy ({strategy.name}) finished, {md.tick_count} ticks replayed")
         # plot strategy PnL
         plot([
             ("Asset Value", strategy.asset_value_history),

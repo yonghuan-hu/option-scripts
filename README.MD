@@ -2,6 +2,17 @@
 
 A collection of python scripts to backtest / simulate option strategies.
 
+## Examples
+
+Backtesting plot, all strategies combined
+![image](README/combined.png)
+
+Backtesting plot, single strategy
+![image](README/covered-call.png)
+
+Backtesting plot, realized volatility
+![image](README/vols.png)
+
 ## Setup
 
 Install conda:

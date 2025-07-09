@@ -40,7 +40,8 @@ def save_realtime_data_1symbol(symbol: str):
     interested_cols = ["timestamp", "contractSymbol", "bid", "ask",
                        "lastPrice", "impliedVolatility", "volume"]
     df = df[interested_cols]
-    df['volume'] = df['volume'].fillna(0)
+    df['impliedVolatility'] = df['impliedVolatility'].round(5)
+    df['volume'] = df['volume'].fillna(0).astype(int)
 
     # save to CSV
     path = f"data/{symbol}-options.csv"

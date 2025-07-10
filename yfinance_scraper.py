@@ -10,8 +10,8 @@ LOG_PATH = "tmp/yfinance_scraper.log"
 SYMBOLS = ["SPY", "QQQ"]
 DTE_RANGE = 7
 TIME_OPEN = time(9, 00, 30)  # yfinance does not show quotes until 9:00 AM CT
-TIME_CLOSE = time(15, 14, 59)  # market closes at 3:15 PM CT
-PERIOD = 30  # scrape every 30 minutes
+TIME_CLOSE = time(15, 15, 59)  # market closes at 3:15 PM CT
+PERIOD = 15  # scrape every PERIOD minutes
 
 
 def save_realtime_data_1symbol(symbol: str):
@@ -28,12 +28,17 @@ def save_realtime_data_1symbol(symbol: str):
 
     # fetch option chains for each expiration
     data = []
+    cutoff = now - timedelta(hours=8)
     for expiry in expirations:
         opt_chain = spy.option_chain(expiry)
         calls = opt_chain.calls.copy()
         puts = opt_chain.puts.copy()
         for df in (calls, puts):
-            df["timestamp"] = int(now.timestamp())
+            # only keep rows having lastTradeDate within the last 8 hours
+            df.rename(columns={
+                "lastTradeDate": "timestamp",
+            }, inplace=True)
+            df = df[df["timestamp"] >= cutoff]
             data.append(df)
 
     # consolidate all data into a single DataFrame and filter columns
@@ -41,6 +46,7 @@ def save_realtime_data_1symbol(symbol: str):
     interested_cols = ["timestamp", "contractSymbol", "bid", "ask",
                        "lastPrice", "impliedVolatility", "volume"]
     df = df[interested_cols]
+    df["timestamp"] = df["timestamp"].astype(int) // 10**9
     df['impliedVolatility'] = df['impliedVolatility'].round(5)
     df['volume'] = df['volume'].fillna(0).astype(int)
 

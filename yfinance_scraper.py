@@ -9,8 +9,9 @@ from log import logger
 LOG_PATH = "tmp/yfinance_scraper.log"
 SYMBOLS = ["SPY", "QQQ"]
 DTE_RANGE = 7
-TIME_OPEN = time(8, 30)
-TIME_CLOSE = time(15, 15)
+TIME_OPEN = time(9, 00, 30)  # yfinance does not show quotes until 9:00 AM CT
+TIME_CLOSE = time(15, 14, 59)  # market closes at 3:15 PM CT
+PERIOD = 30  # scrape every 30 minutes
 
 
 def save_realtime_data_1symbol(symbol: str):
@@ -57,7 +58,8 @@ def save_realtime_data():
 
 if __name__ == "__main__":
     logger.open(LOG_PATH)
-    print("Starting 15-minute polling between 08:30 and 15:15 CT...")
+    print(
+        f"Polling every {PERIOD} minute between {TIME_OPEN} and {TIME_CLOSE} CT...")
     while True:
         now = datetime.now(ZoneInfo("America/Chicago"))
         logger.settime(now)
@@ -67,9 +69,9 @@ if __name__ == "__main__":
         if now.weekday() < 5 and TIME_OPEN <= now.time() <= TIME_CLOSE:
             save_realtime_data()
 
-        # sleep until the next 15-minute moment (.00, .15, .30, .45)
+        # sleep until the next PERIOD-minute moment (e.g. 00, 15, 30, 45)
         now = datetime.now(ZoneInfo("America/Chicago"))
-        minute = (now.minute // 15 + 1) * 15
+        minute = (now.minute // PERIOD + 1) * PERIOD
         if minute == 60:
             # next hour
             next_run = now.replace(

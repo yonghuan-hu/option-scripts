@@ -89,6 +89,11 @@ class MarketDataLoader:
             if current_time is None:
                 current_time = time
 
+            # check data quality
+            if data.bid == 0 and data.ask == 0:
+                print(
+                    f"Found 0x0 option quotes for {symbol} at {time}, please check data quality!")
+
             # when we see a new timestamp, yield the current chain
             if time != current_time:
                 yield current_time, chain

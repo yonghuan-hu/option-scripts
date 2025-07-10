@@ -14,6 +14,16 @@ TIME_CLOSE = time(15, 15, 59)  # market closes at 3:15 PM CT
 PERIOD = 15  # scrape every PERIOD minutes
 
 
+# cache for last seen trade ts to avoid duplicates
+lastTimestamp = {}
+
+
+def has_new_trade(row):
+    instrument = row["contractSymbol"]
+    last = lastTimestamp.get(instrument)
+    return pd.isna(last) or row["timestamp"] > last
+
+
 def save_realtime_data_1symbol(symbol: str):
     spy = yf.Ticker(symbol)
     now = datetime.now(ZoneInfo("America/Chicago"))
@@ -34,15 +44,21 @@ def save_realtime_data_1symbol(symbol: str):
         calls = opt_chain.calls.copy()
         puts = opt_chain.puts.copy()
         for df in (calls, puts):
-            # only keep rows having lastTradeDate within the last 8 hours
             df.rename(columns={
                 "lastTradeDate": "timestamp",
             }, inplace=True)
+            # filter rows to only keep instruments that have
+            # lastTradeDate within the last 8h & newer than cache
             df = df[df["timestamp"] >= cutoff]
+            df = df[df.apply(has_new_trade, axis=1)]
             data.append(df)
+            # update cache
+            for _, row in df.iterrows():
+                lastTimestamp[row["contractSymbol"]] = row["timestamp"]
 
-    # consolidate all data into a single DataFrame and filter columns
+    # consolidate put/call data into a single DataFrame
     df = pd.concat(data, ignore_index=True)
+    # filter columns
     interested_cols = ["timestamp", "contractSymbol", "bid", "ask",
                        "lastPrice", "impliedVolatility", "volume"]
     df = df[interested_cols]

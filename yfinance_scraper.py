@@ -9,12 +9,12 @@ from log import logger
 LOG_PATH = "tmp/yfinance_scraper.log"
 SYMBOLS = ["SPY", "QQQ"]
 DTE_RANGE = 7
-TIME_OPEN = time(9, 00, 30)  # yfinance does not show quotes until 9:00 AM CT
+TIME_OPEN = time(9, 00, 00)  # yfinance does not show quotes until 9:00 AM CT
 TIME_CLOSE = time(15, 15, 59)  # market closes at 3:15 PM CT
 PERIOD = 15  # scrape every PERIOD minutes
 
 
-# cache for last seen trade ts to avoid duplicates
+# cache last seen trade ts to avoid duplicates
 lastTimestamp = {}
 
 

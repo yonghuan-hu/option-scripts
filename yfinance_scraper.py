@@ -24,6 +24,14 @@ def has_new_trade(row):
     return pd.isna(last) or row["timestamp"] > last
 
 
+def quote_price_valid(row):
+    if pd.isna(row["bid"]) or pd.isna(row["ask"]):
+        return False
+    bid = float(row["bid"])
+    ask = float(row["ask"])
+    return bid < ask and bid >= 0
+
+
 def save_realtime_data_1symbol(symbol: str):
     spy = yf.Ticker(symbol)
     now = datetime.now(ZoneInfo("America/Chicago"))
@@ -47,10 +55,13 @@ def save_realtime_data_1symbol(symbol: str):
             df.rename(columns={
                 "lastTradeDate": "timestamp",
             }, inplace=True)
-            # filter rows to only keep instruments that have
-            # lastTradeDate within the last 8h & newer than cache
+            # only keep rows that satisfy ALL of the following:
+            # 1. timestamp is within 8h
+            # 2. timestamp is newer than cache
+            # 3. bid and ask are not both 0
             df = df[df["timestamp"] >= cutoff]
             df = df[df.apply(has_new_trade, axis=1)]
+            df = df[df.apply(quote_price_valid, axis=1)]
             data.append(df)
             # update cache
             for _, row in df.iterrows():

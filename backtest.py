@@ -24,7 +24,8 @@ def backtest(strategy: OptionStrategy, pricer: Pricer, md: MarketDataLoader):
             trade = None
             if order.is_option:
                 # option orders: always fill at market bbo
-                premium = pricer.calculate_theo(order.instrument)
+                # TODO: support limit option orders
+                premium = pricer.market_price_or_theo(order.instrument)
                 trade = Trade(order, premium, order.qty)
             else:
                 # stock orders: check for price limit

@@ -2,6 +2,7 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Iterator, Optional
+from zoneinfo import ZoneInfo
 
 
 @dataclass
@@ -65,7 +66,8 @@ class MarketDataLoader:
     def _stock_generator(self) -> Iterator[StockData]:
         for row in self.stock_reader:
             yield StockData(
-                time=datetime.fromtimestamp(int(row['time'])),
+                time=datetime.fromtimestamp(
+                    int(row['time']), tz=ZoneInfo("America/Chicago")),
                 open=float(row['open']),
                 high=float(row['high']),
                 low=float(row['low']),
@@ -76,12 +78,13 @@ class MarketDataLoader:
         current_time = None
         chain: Dict[str, OptionData] = {}
         for row in self.option_reader:
-            time = datetime.fromtimestamp(int(row['timestamp']))
+            time = datetime.fromtimestamp(
+                int(row['timestamp']), tz=ZoneInfo("America/Chicago"))
             symbol = row['contractSymbol']
             data = OptionData(
                 time=time,
-                bid=float(row['bid']),
-                ask=float(row['ask']),
+                bid=float(row['bid']) if row['bid'] else 0,
+                ask=float(row['ask']) if row['bid'] else 0,
                 last=float(row['lastPrice']),
                 iv=float(row['impliedVolatility']),
                 volume=int(row['volume']) if row['volume'] else 0,
@@ -132,6 +135,7 @@ class MarketDataLoader:
         Check if the next tick is on a different day.
         If there is no next tick, return True.
         """
+        # TODO: handle out of order ticks
         if not self.has_next_tick:
             return True
 

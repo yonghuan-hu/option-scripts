@@ -1,5 +1,5 @@
 import math
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 from matplotlib import pyplot as plt
 from matplotlib import ticker as ticker
 
@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from typing import List
 
 from instrument import *
-from tick import TickData
+from log import logger
+from tick import OptionData, TickData
 
 SECONDS_IN_DAY = 24 * 60 * 60
 SECONDS_IN_YEAR = 365 * SECONDS_IN_DAY
@@ -98,12 +99,18 @@ class Pricer:
     Theo calculator based on BSM and historical volatility.
     """
 
+    time: datetime
+    val: float
+    option_prices: Dict[str, OptionData] = {}
+    tick_history: List[TickData] = []
+
+    # EVENT HANDLERS
+
     def __init__(self, r: float):
         """
         Initialize the pricer with a fixed risk-free rate.
         """
         self.r = r
-        self.tick_history: List[TickData] = []
 
     def val_event(self, time: datetime, price: float):
         """
@@ -117,9 +124,13 @@ class Pricer:
         Handler for full tick data update.
         """
         self.tick_history.append(tick)
+        for option, price in tick.option_prices.items():
+            self.option_prices[option] = price
         # clean up data older than 1 year
         cutoff = self.time - timedelta(days=365)
         self.tick_history = [t for t in self.tick_history if t.time >= cutoff]
+
+    # NUMERIC METHODS
 
     def estimate_vol(self, option: Option, yte: float) -> float:
         """
@@ -166,6 +177,22 @@ class Pricer:
         theo = round_to_cent(price)
 
         return theo
+
+    def market_price_or_theo(self, option: Option) -> float:
+        """
+        Find the latest market price for an option, or calculate_theo if not available.
+        """
+        if option in self.option_prices:
+            price = self.option_prices[str(option)]
+            logger.info(
+                f"Market price for {option} is {price.last} ({price.iv * 100}% IV), last trade at {price.time}")
+            return price.last
+        else:
+            theo = self.calculate_theo(option)
+            logger.info(f"Market price for {option} not found, theo is {theo}")
+            return theo
+
+    # HELPERS
 
     def plot_vols(self, plot_path: str):
         """

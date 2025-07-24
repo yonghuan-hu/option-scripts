@@ -4,6 +4,10 @@ from datetime import datetime
 from instrument import *
 from strategy_base import OptionStrategy
 
+# TODO's re/ real market data:
+# 1. expirations must be weekdays
+# 2. strikes must be multiples of 5
+
 
 class WheelStrategy(OptionStrategy):
 
@@ -14,7 +18,7 @@ class WheelStrategy(OptionStrategy):
         self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
-        if time.hour == 8 and time.minute == 30:
+        if not self.trades_option_open:
             if self.holding_stock:
                 # sell call
                 strike = math.floor(price * (1.0 + self.call_otm_pct))
@@ -35,7 +39,7 @@ class SellCoveredCallStrategy(OptionStrategy):
         self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
-        if time.hour == 8 and time.minute == 30:
+        if not self.trades_option_open:
             if self.holding_stock:
                 # sell call
                 strike = math.floor(price * (1.0 + self.call_otm_pct))
@@ -64,7 +68,7 @@ class SellPutStrategy(OptionStrategy):
                 buy=False, price=price, qty=qty)
         else:
             # sell put daily
-            if time.hour == 8 and time.minute == 30:
+            if not self.trades_option_open:
                 strike = math.ceil(price * (1.0 - self.put_otm_pct))
                 self.send_order_option(
                     buy=False, call=False, dte=self.dte, strike=strike, qty=1)

@@ -101,7 +101,6 @@ class Pricer:
 
     time: datetime
     val: float
-    option_prices: Dict[str, OptionData] = {}
     tick_history: List[TickData] = []
 
     # EVENT HANDLERS
@@ -124,9 +123,8 @@ class Pricer:
         Handler for full tick data update.
         """
         self.tick_history.append(tick)
-        for option, price in tick.option_prices.items():
-            self.option_prices[option] = price
         # clean up data older than 1 year
+        # TODO: improve performance here by using a fifo queue
         cutoff = self.time - timedelta(days=365)
         self.tick_history = [t for t in self.tick_history if t.time >= cutoff]
 
@@ -182,7 +180,7 @@ class Pricer:
         """
         Find the latest market price for an option, or calculate_theo if not available.
         """
-        if option in self.option_prices:
+        if str(option) in self.option_prices:
             price = self.option_prices[str(option)]
             logger.info(
                 f"Market price for {option} is {price.last} ({price.iv * 100}% IV), last trade at {price.time}")
@@ -190,9 +188,18 @@ class Pricer:
         else:
             theo = self.calculate_theo(option)
             logger.info(f"Market price for {option} not found, theo is {theo}")
+            logger.info(str(self.last_tick))
             return theo
 
     # HELPERS
+
+    @property
+    def last_tick(self) -> TickData:
+        return self.tick_history[-1]
+
+    @property
+    def option_prices(self) -> Dict[str, OptionData]:
+        return self.last_tick.option_prices
 
     def plot_vols(self, plot_path: str):
         """

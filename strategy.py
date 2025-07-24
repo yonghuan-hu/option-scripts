@@ -6,7 +6,6 @@ from strategy_base import OptionStrategy
 
 # TODO's re/ real market data:
 # 1. expirations must be weekdays
-# 2. strikes must be multiples of 5
 
 
 class WheelStrategy(OptionStrategy):
@@ -18,15 +17,15 @@ class WheelStrategy(OptionStrategy):
         self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
-        if not self.trades_option_open:
+        if time.hour >= 10 and not self.trades_option_open:
             if self.holding_stock:
                 # sell call
-                strike = math.floor(price * (1.0 + self.call_otm_pct))
+                strike = compute_strike(price, self.call_otm_pct, 5)
                 self.send_order_option(
                     buy=False, call=True, dte=self.dte, strike=strike, qty=1)
             else:
                 # sell put
-                strike = math.ceil(price * (1.0 - self.put_otm_pct))
+                strike = compute_strike(price, -self.put_otm_pct, 5)
                 self.send_order_option(
                     buy=False, call=False, dte=self.dte, strike=strike, qty=1)
 
@@ -39,10 +38,10 @@ class SellCoveredCallStrategy(OptionStrategy):
         self.dte = dte
 
     def tick_logic(self, time: datetime, price: float):
-        if not self.trades_option_open:
+        if time.hour >= 10 and not self.trades_option_open:
             if self.holding_stock:
                 # sell call
-                strike = math.floor(price * (1.0 + self.call_otm_pct))
+                strike = compute_strike(price, self.call_otm_pct, 5)
                 self.send_order_option(
                     buy=False, call=True, dte=self.dte, strike=strike, qty=1)
             else:
@@ -68,8 +67,8 @@ class SellPutStrategy(OptionStrategy):
                 buy=False, price=price, qty=qty)
         else:
             # sell put daily
-            if not self.trades_option_open:
-                strike = math.ceil(price * (1.0 - self.put_otm_pct))
+            if time.hour >= 10 and not self.trades_option_open:
+                strike = compute_strike(price, -self.put_otm_pct, 5)
                 self.send_order_option(
                     buy=False, call=False, dte=self.dte, strike=strike, qty=1)
 

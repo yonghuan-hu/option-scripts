@@ -18,6 +18,19 @@ def to_expiration(date: date) -> datetime:
     return datetime(date.year, date.month, date.day, 16, 30, tzinfo=ZoneInfo("America/Chicago"))
 
 
+def round_strike(price: float, granularity: int) -> int:
+    """
+    Convert a price to a strike.
+    Strikes are rounded to the nearest multiple of granularity.
+    """
+    assert granularity > 0
+    return int(round(price / granularity) * granularity)
+
+
+def compute_strike(price: float, otm_pct: float, granularity: int) -> int:
+    return round_strike(price * (1.0 + otm_pct), granularity=granularity)
+
+
 @dataclass
 class Option:
     product: str

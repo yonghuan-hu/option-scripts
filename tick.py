@@ -156,7 +156,7 @@ class MarketDataLoader:
             self.latest_stock = self.next_stock
             self.next_stock = next(self.stock_iter, None)
         if self.next_option_time and self.next_option_time == time:
-            self.latest_options = self.next_option_chain
+            self.latest_options.update(self.next_option_chain)
             self.next_option_time, self.next_option_chain = next(
                 self.option_iter, (None, {}))
 
@@ -170,11 +170,9 @@ class MarketDataLoader:
 if __name__ == "__main__":
     # Example usage
     md = MarketDataLoader(
-        stock_filename='data/SPY-test.csv',
+        stock_filename='data/SPY-202507-15min.csv',
         option_filename='data/SPY-options.csv'
     )
-    while True:
+    while md.has_next_tick:
         tick = md.next_tick()
-        if tick is None:
-            break
         print(tick.time, tick.stock_price.open, len(tick.option_prices))

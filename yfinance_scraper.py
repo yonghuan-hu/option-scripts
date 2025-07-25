@@ -86,7 +86,14 @@ def save_realtime_data_1symbol(symbol: str):
 
 def save_realtime_data():
     for symbol in SYMBOLS:
-        save_realtime_data_1symbol(symbol)
+        # retry 3 times in case of failure
+        for _ in range(3):
+            try:
+                save_realtime_data_1symbol(symbol)
+                break  # success, exit retry loop
+            except Exception as e:
+                logger.error(f"Error fetching data for {symbol}: {e}")
+                sleep(5)  # wait before retrying
 
 
 if __name__ == "__main__":

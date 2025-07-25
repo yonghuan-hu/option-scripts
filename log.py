@@ -11,6 +11,9 @@ class Logger:
     def info(self, message: str):
         print(f"[{self.time}] {message}", file=self.file)
 
+    def warn(self, message: str):
+        print(f"[{self.time}] [WARN] {message}", file=self.file)
+
     def error(self, message: str):
         print(f"[{self.time}] [ERROR] {message}", file=self.file)
 

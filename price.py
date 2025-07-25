@@ -187,8 +187,8 @@ class Pricer:
             return price.last
         else:
             theo = self.calculate_theo(option)
-            logger.info(f"Market price for {option} not found, theo is {theo}")
-            logger.info(str(self.last_tick))
+            logger.warn(f"Market price for {option} not found, theo is {theo}")
+            logger.warn(str(self.last_tick))
             return theo
 
     # HELPERS

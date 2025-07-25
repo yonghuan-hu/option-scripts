@@ -4,9 +4,6 @@ from datetime import datetime
 from instrument import *
 from strategy_base import OptionStrategy
 
-# TODO's re/ real market data:
-# 1. expirations must be weekdays
-
 
 class WheelStrategy(OptionStrategy):
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Union
 from zoneinfo import ZoneInfo
@@ -13,8 +13,12 @@ class InstrumentType(Enum):
 def to_expiration(date: date) -> datetime:
     """
     Create a datetime object for the given year, month, and day.
-    Options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT)
+    If the given day falls on a weekend, the next Monday will be selected.
+    Options stop trading at 4pm ET (3 CT), but can be exercised until 5:30pm ET (4:30 CT).
     """
+    if date.weekday() >= 5:
+        # If the date is Saturday or Sunday, move to next Monday
+        date = date + timedelta(days=(7 - date.weekday()))
     return datetime(date.year, date.month, date.day, 16, 30, tzinfo=ZoneInfo("America/Chicago"))
 
 

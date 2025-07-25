@@ -144,6 +144,7 @@ class Pricer:
 
         # Vol skew adjustment
         # TODO: improve IV model, especially how d(IV)/d(OTM) changes with OTM
+        # we should fit market IV
         otm_factor = 1 + 3.0/(yte * 365)  # vol += otm_factor per 1% OTM
         otm_pct = math.fabs(option.strike - self.val) / self.val
         vol += otm_pct * otm_factor

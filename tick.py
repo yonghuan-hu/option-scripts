@@ -24,6 +24,8 @@ class StockData:
     close: float
 
 
+# TODO: only advance stock time and gather options before each stock time
+
 @dataclass
 class TickData:
     """
